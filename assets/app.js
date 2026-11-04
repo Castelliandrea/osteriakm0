@@ -1,22 +1,17 @@
-const toggle = document.querySelector('.toggle');
-const navigation = document.querySelector('.navlinks');
-function closeNav(){ navigation.classList.remove('open'); toggle.setAttribute('aria-expanded','false'); }
-toggle?.addEventListener('click',()=>{const open=toggle.getAttribute('aria-expanded')!=='true';toggle.setAttribute('aria-expanded',String(open));navigation.classList.toggle('open',open);});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeNav();});
-navigation?.addEventListener('click',e=>{if(e.target.closest('a'))closeNav();});
-const menu=window.OSTERIA_MENU;
-if(menu?.published && menu.categories?.length){
- const content=document.getElementById('menu-content'), filters=document.getElementById('menu-filters');
- document.getElementById('menu-notice').textContent=menu.notice; filters.hidden=false;
- const sections=[];
- const button=(label,key)=>{const b=document.createElement('button');b.type='button';b.className='filter';b.textContent=label;b.setAttribute('aria-pressed',String(key==='all'));b.addEventListener('click',()=>{filters.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));sections.forEach((s,i)=>s.hidden=key!=='all' && key!==i);});filters.append(b);};
- button('Tutto','all');
- menu.categories.forEach((category,index)=>{button(category.name,index);const section=document.createElement('section');section.className='menu-group';const h=document.createElement('h2');h.textContent=category.name;section.append(h);(category.items||[]).forEach(item=>{const row=document.createElement('article');row.className='menu-item';const text=document.createElement('div'),title=document.createElement('h3'),description=document.createElement('p'),price=document.createElement('span');title.textContent=item.name;description.textContent=item.description||'';price.className='price';price.textContent=typeof item.price==='number'?new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(item.price):item.price||'';text.append(title,description);row.append(text,price);section.append(row);});sections.push(section);content.append(section);});
-}
-const form=document.getElementById('booking-form');
-if(form){
- const date=form.elements.date;const now=new Date();const localDate=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);date.min=localDate;
- form.addEventListener('submit',e=>{e.preventDefault();if(date.value<localDate){date.setCustomValidity('Seleziona una data futura o odierna.');date.reportValidity();return;}date.setCustomValidity('');const d=new Date(date.value+'T12:00:00').toLocaleDateString('it-IT');document.getElementById('booking-text').value=`Buongiorno, sono ${form.elements.guest.value.trim()}. Vorrei chiedere disponibilità per ${form.elements.people.value} persone il ${d} alle ${form.elements.time.value}.${form.elements.notes.value.trim()?' Note: '+form.elements.notes.value.trim():''} Grazie!`;document.getElementById('booking-result').hidden=false;document.getElementById('booking-status').textContent='Promemoria generato, non inviato. Chiama il ristorante per confermare.';});
- date.addEventListener('input',()=>date.setCustomValidity(''));
- document.getElementById('copy-booking').addEventListener('click',async()=>{const text=document.getElementById('booking-text');try{await navigator.clipboard.writeText(text.value);document.getElementById('booking-status').textContent='Testo copiato. La richiesta non è stata inviata.';}catch{ text.focus();text.select();document.getElementById('booking-status').textContent='Seleziona e copia il testo manualmente. La richiesta non è stata inviata.';}});
+const site=window.SITE;
+document.querySelectorAll('[data-address]').forEach(el=>el.textContent=site.address);
+document.querySelectorAll('[data-phone]').forEach(el=>{el.href='tel:'+site.phone.replace(/[^+\d]/g,'');if(!el.textContent.trim())el.textContent=site.phone;});
+document.querySelectorAll('[data-link]').forEach(el=>el.href=site[el.dataset.link]);
+const hours=document.getElementById('hours');if(hours)site.hours.forEach(line=>{const p=document.createElement('p');p.textContent=line;hours.append(p);});
+const toggle=document.querySelector('.toggle'),nav=document.querySelector('.navlinks');
+function closeNav(){nav.classList.remove('open');toggle.setAttribute('aria-expanded','false');}
+toggle.addEventListener('click',()=>{const open=toggle.getAttribute('aria-expanded')!=='true';toggle.setAttribute('aria-expanded',String(open));nav.classList.toggle('open',open);});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeNav();});nav.addEventListener('click',e=>{if(e.target.closest('a'))closeNav();});
+if(document.getElementById('menu-content')){
+ const menu=window.MENU,content=document.getElementById('menu-content'),filters=document.getElementById('filters'),search=document.getElementById('menu-search'),veg=document.getElementById('vegetarian');let selected=-1,vegetarian=false;const buttons=[];const money=new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'});
+ const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ function makeButton(label,index){const b=document.createElement('button');b.type='button';b.className='filter';b.textContent=label;b.addEventListener('click',()=>{selected=index;render();});filters.append(b);buttons.push([b,index]);}
+ makeButton('Tutto',-1);menu.categories.forEach((cat,i)=>makeButton(cat.name,i));
+ function render(){content.replaceChildren();let count=0;buttons.forEach(([b,i])=>b.setAttribute('aria-pressed',String(i===selected)));veg.setAttribute('aria-pressed',String(vegetarian));const query=norm(search.value.trim());menu.categories.forEach((cat,i)=>{if(selected!==-1&&selected!==i)return;const items=cat.items.filter(x=>(!vegetarian||x.tags.includes('Vegetariano'))&&norm(x.name+' '+x.description).includes(query));if(!items.length)return;count+=items.length;const section=document.createElement('section');section.className='menu-section';const title=document.createElement('h2'),intro=document.createElement('p'),grid=document.createElement('div');title.textContent=cat.name;intro.textContent=cat.intro||'';grid.className='menu-grid';items.forEach(x=>{const article=document.createElement('article');article.className='dish';const top=document.createElement('div'),h=document.createElement('h3'),price=document.createElement('span'),description=document.createElement('p'),tags=document.createElement('div');top.className='dish-top';h.textContent=x.name;price.className='price';price.textContent=typeof x.price==='number'?money.format(x.price):x.price;description.textContent=x.description;tags.className='tags';(x.tags||[]).forEach(tag=>{const t=document.createElement('span');t.className='tag'+(tag==='La nostra scelta'?' pick':'');t.textContent=tag;tags.append(t);});top.append(h,price);article.append(top,description,tags);grid.append(article);});section.append(title,intro,grid);content.append(section);});document.getElementById('empty').hidden=count>0;document.getElementById('result-count').textContent=count+' proposte'+(selected===-1?' nel menù':' nella categoria');}
+ search.addEventListener('input',render);veg.addEventListener('click',()=>{vegetarian=!vegetarian;render();});document.getElementById('reset').addEventListener('click',()=>{selected=-1;vegetarian=false;search.value='';render();});document.getElementById('menu-note').textContent=menu.note;render();
 }
